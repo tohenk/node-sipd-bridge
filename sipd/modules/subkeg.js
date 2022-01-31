@@ -1,0 +1,153 @@
+/**
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+ * of the Software, and to permit persons to whom the Software is furnished to do
+ * so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+const fs = require('fs');
+const glob = require('glob');
+const path = require('path');
+const { By } = require('selenium-webdriver');
+const Work = require('@ntlab/ntlib/work');
+const Queue = require('@ntlab/ntlib/queue');
+const SipdAgr = require('./agr');
+const SipdData = require('../data');
+const SipdPath = require('../path');
+const SipdUtil = require('../util');
+
+class SipdSubkeg {
+
+    constructor(owner) {
+        this.owner = owner;
+        this.agr = new SipdAgr();
+    }
+
+    download(outdir, subkeg, skipDownload) {
+        if (!fs.existsSync(outdir)) {
+            fs.mkdirSync(outdir);
+        }
+        this.agr.clear();
+        const works = [];
+        if (!skipDownload) {
+            works.push(() => this.downloadKegList(outdir, subkeg));
+        }
+        works.push(
+            () => this.importAgr(outdir),
+            () => this.exportXls(outdir),
+        );
+        return Work.works(works);
+    }
+
+    downloadKegList(outdir, subkeg) {
+        console.log('Downloading list...');
+        return Work.works([
+            () => this.owner.app.clickMenu('Sub Kegiatan Belanja'),
+            () => new Promise((resolve, reject) => {
+                this.owner.data.pickData(SipdData.SHOW_ITEM_ALL)
+                    .then(result => {
+                        if (result.length) {
+                            result.sort((a, b) => a.kode_sub_giat.localeCompare(b.kode_sub_giat));
+                            const q = new Queue(result, (info) => {
+                                let doit = SipdUtil.makeFloat(info.rincian) > 0;
+                                if (doit && subkeg) {
+                                    if (Array.isArray(subkeg)) {
+                                        doit = subkeg.indexOf(SipdUtil.cleanKode(info.kode_sub_giat)) >= 0;
+                                    } else {
+                                        doit = subkeg == SipdUtil.cleanKode(info.kode_sub_giat);
+                                    }
+                                }
+                                if (doit) {
+                                    this.downloadKeg(outdir, info.kode_sub_giat)
+                                        .then(() => q.next())
+                                        .catch(err => reject(err))
+                                    ;
+                                } else {
+                                    q.next();
+                                }
+                            });
+                            q.once('done', () => resolve(true));
+                        } else {
+                            resolve(false);
+                        }
+                    })
+                ;
+            }),
+        ]);
+    }
+
+    downloadKeg(outdir, keg) {
+        console.log('Downloading %s...', keg);
+        let filename = SipdUtil.cleanKode(keg) + '.json';
+        let popup;
+        return Work.works([
+            () => this.owner.app.clickMenu('Sub Kegiatan Belanja'),
+            () => this.owner.data.setPageSize(SipdData.SHOW_ITEM_ALL),
+            () => this.owner.data.waitProcessing(),
+            () => new Promise((resolve, reject) => {
+                this.owner.findElement(By.xpath(SipdPath.getKegMenu(keg)))
+                    .then(el => {
+                        popup = el;
+                        popup.click().then(() => resolve());
+                    })
+                    .catch(err => reject(err))
+                ;
+            }),
+            () => this.owner.sleep(this.owner.opdelay),
+            () => new Promise((resolve, reject) => {
+                this.owner.findElement({el: popup, data: By.xpath(SipdPath.getKegMenuItem('Detil Rincian'))})
+                    .then(el => el.click().then(() => resolve()))
+                    .catch(err => reject(err))
+                ;
+            }),
+            () => this.owner.data.saveData(path.join(outdir, filename), SipdData.SHOW_ITEM_ALL),
+        ]);
+    }
+
+    importAgr(outdir) {
+        return new Promise((resolve, reject) => {
+            let count = 0;
+            glob(path.join(outdir, '*.json'), (err, files) => {
+                if (err) return reject(err);
+                const q = new Queue(files, (f) => {
+                    const data = JSON.parse(fs.readFileSync(f));
+                    this.agr.import(data);
+                    count++;
+                    q.next();
+                });
+                q.once('done', () => {
+                    console.log('Done importing %d files...', count);
+                    resolve(count)
+                });
+            });
+        });
+    }
+
+    exportXls(outdir) {
+        return new Promise((resolve, reject) => {
+            this.agr.exportXls(outdir)
+                .then(() => resolve())
+                .catch(err => reject(err))
+            ;
+        });        
+    }
+}
+
+module.exports = SipdSubkeg;
