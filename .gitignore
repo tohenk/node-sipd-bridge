@@ -104,6 +104,6 @@ dist
 .tern-port
 
 # app
-agr/
-profile/
-refs/
+/agr/
+/profile/
+/refs/
