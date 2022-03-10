@@ -26,6 +26,7 @@ const fs = require('fs');
 const glob = require('glob');
 const path = require('path');
 const { By } = require('selenium-webdriver');
+const DomParser = require('dom-parser');
 const Work = require('@ntlab/ntlib/work');
 const Queue = require('@ntlab/ntlib/queue');
 const SipdAgr = require('./agr');
@@ -60,10 +61,33 @@ class SipdSubkeg {
         console.log('Downloading list...');
         return Work.works([
             () => this.owner.app.clickMenu('Sub Kegiatan Belanja'),
-            () => new Promise((resolve, reject) => {
-                this.owner.data.pickData(SipdData.SHOW_ITEM_ALL)
-                    .then(result => {
-                        if (result.length) {
+            () => this.downloadSkpdOrKegList(outdir, subkeg),
+        ]);
+    }
+
+    downloadSkpdOrKegList(outdir, subkeg) {
+        return new Promise((resolve, reject) => {
+            this.owner.data.pickData(SipdData.SHOW_ITEM_ALL)
+                .then(result => {
+                    if (result.length) {
+                        // is skpd?
+                        if (!result[0].kode_sub_giat) {
+                            // process SKPD
+                            const q = new Queue(result, (info) => {
+                                const url = this.owner.sipdurl.getMainUrl(info.nama_skpd.sParam);
+                                this.owner.getDriver().get(url)
+                                    .then(() => {
+                                        this.downloadSkpdOrKegList(outdir, subkeg)
+                                            .then(() => q.next())
+                                            .catch(err => reject(err))
+                                        ;
+                                    })
+                                    .catch(err => reject(err))
+                                ;
+                            });
+                            q.once('done', () => resolve(true));
+                        } else {
+                            // process SUBKEG
                             result.sort((a, b) => a.kode_sub_giat.localeCompare(b.kode_sub_giat));
                             const q = new Queue(result, (info) => {
                                 let doit = SipdUtil.makeFloat(info.rincian) > 0;
@@ -75,7 +99,8 @@ class SipdSubkeg {
                                     }
                                 }
                                 if (doit) {
-                                    this.downloadKeg(outdir, info.kode_sub_giat)
+                                    const url = this.owner.sipdurl.getMainUrl(this.getRinciUrl(info.action));
+                                    this.downloadKeg(outdir, info.kode_sub_giat, url)
                                         .then(() => q.next())
                                         .catch(err => reject(err))
                                     ;
@@ -84,39 +109,33 @@ class SipdSubkeg {
                                 }
                             });
                             q.once('done', () => resolve(true));
-                        } else {
-                            resolve(false);
                         }
-                    })
-                ;
-            }),
-        ]);
+                    } else {
+                        resolve(false);
+                    }
+                })
+            ;
+        });
     }
 
-    downloadKeg(outdir, keg) {
+    getRinciUrl(str) {
+        let result = null;
+        const dom = new DomParser().parseFromString(str);
+        const nodes = dom.getElementsByTagName('a');
+        nodes.forEach(node => {
+            if (node.innerHTML.match(/Detil Rincian/)) {
+                result = node.getAttribute('href').split('?')[1];
+                return true;
+            }
+        });
+        return result;
+    }
+
+    downloadKeg(outdir, keg, url) {
         console.log('Downloading %s...', keg);
         let filename = SipdUtil.cleanKode(keg) + '.json';
-        let popup;
         return Work.works([
-            () => this.owner.app.clickMenu('Sub Kegiatan Belanja'),
-            () => this.owner.data.setPageSize(SipdData.SHOW_ITEM_ALL),
-            () => this.owner.data.waitProcessing(),
-            () => new Promise((resolve, reject) => {
-                this.owner.findElement(By.xpath(SipdPath.getKegMenu(keg)))
-                    .then(el => {
-                        popup = el;
-                        popup.click().then(() => resolve());
-                    })
-                    .catch(err => reject(err))
-                ;
-            }),
-            () => this.owner.sleep(this.owner.opdelay),
-            () => new Promise((resolve, reject) => {
-                this.owner.findElement({el: popup, data: By.xpath(SipdPath.getKegMenuItem('Detil Rincian'))})
-                    .then(el => el.click().then(() => resolve()))
-                    .catch(err => reject(err))
-                ;
-            }),
+            () => this.owner.getDriver().get(url),
             () => this.owner.data.saveData(path.join(outdir, filename), SipdData.SHOW_ITEM_ALL),
         ]);
     }

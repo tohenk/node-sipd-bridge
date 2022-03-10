@@ -37,8 +37,8 @@ class SipdUrl {
         return url;
     }
 
-    getMainUrl() {
-        return this.getUrl('main');
+    getMainUrl(path) {
+        return this.getUrl('main') + (path ? '?' + path : '');
     }
 }
 
