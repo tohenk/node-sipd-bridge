@@ -25,16 +25,17 @@
 const fs = require('fs');
 const path = require('path');
 const Cmd = require('@ntlab/ntlib/cmd');
-const Work = require('@ntlab/ntlib/work');
 const Sipd = require('./sipd');
 
 Cmd.addVar('config', 'c', 'Set configuration file', 'filename');
 Cmd.addVar('mode', '', 'Processing mode, can be download or upload', 'mode');
-Cmd.addVar('url', '', 'Set sipd url', 'url');
-Cmd.addVar('username', 'u', 'Set login username', 'username');
-Cmd.addVar('password', 'p', 'Set login password', 'password');
+Cmd.addVar('url', '', 'Set SIPD url', 'url');
+Cmd.addVar('username', 'u', 'Set username', 'username');
+Cmd.addVar('password', 'p', 'Set password', 'password');
 Cmd.addVar('year', 'y', 'Set year', 'year');
 Cmd.addVar('dir', 'd', 'Set input or output directory', 'filename-or-folder');
+Cmd.addBool('no-download', '', 'Do not download from SIPD instead use previously downloaded files', false);
+Cmd.addBool('help', '', 'Show program usage', false);
 
 if (!Cmd.parse() || (Cmd.get('help') && usage())) {
     process.exit();
@@ -61,6 +62,7 @@ class App {
         if (Cmd.get('password')) this.config.password = Cmd.get('password');
         if (Cmd.get('year')) this.config.year = Cmd.get('year');
         if (Cmd.get('dir')) this.config.dir = Cmd.get('dir');
+        if (Cmd.get('no-download')) this.config.skipDownload = Cmd.get('no-download');
         if (!this.config.workdir) this.config.workdir = __dirname;
         if (!this.config.mode) this.config.mode = Cmd.get('mode') ? Cmd.get('mode') : Sipd.DOWNLOAD;
     
@@ -117,8 +119,8 @@ class App {
         }
         const works = sipd.getWorks();
         if (works) {
-            Work.works(works, (next) => {
-                sipd.sleep(500).then(() => next());
+            sipd.works(works, next => {
+                setTimeout(() => next(), 500);
             }).then(() => {
                 sipd.app.showMessage('Information', 'The process has been completed! :)');
                 console.log('Done');

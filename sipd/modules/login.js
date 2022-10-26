@@ -23,7 +23,6 @@
  */
 
 const { By } = require('selenium-webdriver');
-const Work = require('@ntlab/ntlib/work');
 const SipdPath = require('../path');
  
 class SipdLogin {
@@ -34,10 +33,10 @@ class SipdLogin {
 
     checkLogin(needLogin = true) {
         return new Promise((resolve, reject) => {
-            this.owner.getDriver().findElements(By.xpath(SipdPath.LOGIN_FORM))
+            this.owner.findElements(By.xpath(SipdPath.LOGIN_FORM))
                 .then((elements) => {
                     let el;
-                    const f = (success) => {
+                    const f = success => {
                         if ((needLogin && success) || (!needLogin && !success)) {
                             resolve(el);
                         } else {
@@ -59,26 +58,26 @@ class SipdLogin {
     }
 
     login() {
-        return new Promise((resolve, reject) => {
-            this.checkLogin()
-                .then(form => {
-                    Work.works([
-                            () => this.owner.fillInForm([
-                                    {parent: form, target: By.name('user_name'), value: this.owner.username},
-                                    {parent: form, target: By.name('user_password'), value: this.owner.password},
-                                ],
-                                By.xpath(SipdPath.LOGIN_FORM),
-                                By.xpath(SipdPath.LOGIN_FORM_SUBMIT)
-                            ),
-                            () => this.owner.sleep(this.owner.wait)
-                        ])
-                        .then(() => resolve())
-                        .catch(err => reject(err))
-                    ;
-                })
-                .catch(err => reject(err))
-            ;
-        });
+        return this.owner.works([
+            [w => this.checkLogin()],
+            [w => this.owner.fillInForm([
+                    {parent: w.getRes(0), target: By.name('user_name'), value: this.owner.username},
+                    {parent: w.getRes(0), target: By.name('user_password'), value: this.owner.password},
+                ],
+                By.xpath(SipdPath.LOGIN_FORM),
+                By.xpath(SipdPath.LOGIN_FORM_SUBMIT)
+            )],
+            [w => this.waitLoader()],
+            [w => this.waitToast()],
+        ]);
+    }
+
+    waitLoader() {
+        return this.owner.waitPresence(By.xpath('//div[contains(@class,"blockOverlay")]'));
+    }
+
+    waitToast() {
+        return this.owner.waitPresence(By.xpath('//div[contains(@class,"jq-toast-wrap")]'));
     }
 }
 

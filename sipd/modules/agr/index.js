@@ -47,7 +47,7 @@ class SipdAgr {
 
     exportXls(outdir) {
         return new Promise((resolve, reject) => {
-            const q = new Queue(this.items, (subkeg) => {
+            const q = new Queue(this.items, subkeg => {
                 const filename = path.join(outdir, subkeg.kode + '.xlsx');
                 console.log('Writing %s...', filename);
                 const wb = new Excel.Workbook();
@@ -91,7 +91,7 @@ class SipdAgrSubKeg {
     }
 
     importPek(data) {
-        let s = SipdUtil.cleanText(data.subs_bl_teks);
+        let s = SipdUtil.cleanText(typeof data.subs_bl_teks == 'object' ? data.subs_bl_teks.subs_asli : data.subs_bl_teks);
         let pek = this.getPek(s);
         if (!pek) {
             pek = new SipdAgrPek(s);
@@ -200,7 +200,7 @@ class SipdAgrRinci {
             const penerima = SipdUtil.cleanText(data.lokus_akun_teks);
             let uraian = SipdUtil.cleanText(data.ket_bl_teks);
             if (uraian) {
-                if (uraian.indexOf(penerima) < 0) {
+                if (!SipdUtil.isAlamat(uraian) && uraian.indexOf(penerima) < 0) {
                     this.spek = uraian;
                     uraian = penerima;
                 }

@@ -23,7 +23,6 @@
  */
 
 const WebRobot = require('@ntlab/webrobot');
-const Work = require('@ntlab/ntlib/work');
 const SipdApp = require('./modules/app');
 const SipdLogin = require('./modules/login');
 const SipdSubkeg = require('./modules/subkeg');
@@ -55,19 +54,12 @@ class Sipd extends WebRobot {
         return new Promise((resolve, reject) => {
             let retry = 1;
             const f = () => {
-                Work.works([
-                        () => this.app.openApp(this.SIPD_APP),
-                        () => this.sleep(this.animedelay),
-                        () => this.login.login(),
-                        () => this.sleep(this.animedelay),
-                        () => new Promise((resolve, reject) => {
-                            this.app.checkMain()
-                                .then(ismain => {
-                                    if (ismain) return resolve();
-                                    reject('Can\'t reach main page, login may be failed');
-                                })
-                            ;
-                        }),
+                this.works([
+                        [w => this.app.openApp(this.SIPD_APP)],
+                        [w => this.login.login()],
+                        [w => this.sleep(this.animedelay)],
+                        [w => this.app.checkMain()],
+                        [w => Promise.reject('Can\'t reach main page, login may be failed'), w => !w.getRes(3)],
                     ])
                     .then(() => resolve())
                     .catch(err => {
@@ -86,30 +78,81 @@ class Sipd extends WebRobot {
     }
 
     getWorks() {
-        const works = [];
+        const works = this.getCommonWorks();
         switch (this.options.mode) {
             case Sipd.UPLOAD:
                 break;
             case Sipd.DOWNLOAD:
-                if (!this.options.skipDownload) {
-                    works.push(
-                        () => this.start(),
-                        () => this.app.setYear(),
-                    );
-                }
-                works.push(() => this.subkeg.download(this.options.dir, this.options.keg, this.options.skipDownload));
+                works.push([w => this.subkeg.download(this.options.dir, this.options.keg, this.options.skipDownload)]);
                 break;
             case Sipd.UPDATE:
-                if (!this.options.skipDownload) {
-                    works.push(
-                        () => this.start(),
-                        () => this.app.setYear(),
-                    );
-                }
-                works.push(() => this.refs.download(this.options.dir, this.options.skipDownload));
+                works.push([w => this.refs.download(this.options.dir, this.options.skipDownload)]);
                 break;
         }
         return works;
+    }
+
+    getCommonWorks() {
+        const works = [];
+        const mode = this.options.mode;
+        if (mode == Sipd.DOWNLOAD || mode == Sipd.UPDATE) {
+            if (!this.options.skipDownload) {
+                works.push(
+                    [w => this.start()],
+                    [w => this.app.setYear()],
+                );
+            } else {
+                works.push([w => Promise.resolve(console.log('Skipping download...'))]);
+            }
+        }
+        return works;
+    }
+
+    waitAndClickAnimate(data) {
+        return this.works([
+            [w => this.waitFor(data)],
+            [w => this.sleep(this.animedelay)],
+            [w => w.getRes(0).click()],
+            [w => Promise.resolve(w.getRes(0))],
+        ]);
+    }
+
+    waitPresence(data, time = null) {
+        if (null == time) {
+            time = this.wait;
+        }
+        return new Promise((resolve, reject) => {
+            let shown = false;
+            let t = Date.now();
+            const f = () => {
+                this.works([
+                    [w => this.findElements(data)],
+                    [w => new Promise((resolve, reject) => {
+                        let wait = true;
+                        if (shown && w.res.length == 0) {
+                            wait = false;
+                        }
+                        if (w.res.length == 1 && !shown) {
+                            shown = true;
+                        }
+                        // is timed out
+                        if (!shown && Date.now() - t > time) {
+                            wait = false;
+                        }
+                        resolve(wait);
+                    })],
+                ])
+                .then(result => {
+                    if (result) {
+                        setTimeout(f, !shown ? 250 : 500);
+                    } else {
+                        resolve();
+                    }
+                })
+                .catch(err => reject(err));
+            }
+            f();
+        });
     }
 
     static get UPLOAD() {

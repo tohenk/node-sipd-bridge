@@ -23,7 +23,6 @@
  */
 
 const { By } = require('selenium-webdriver');
-const Work = require('@ntlab/ntlib/work');
 const SipdPath = require('../path');
 const SipdScript = require('../script');
 
@@ -34,10 +33,9 @@ class SipdApp {
     }
 
     openApp(app) {
-        return Work.works([
-            () => this.owner.open(),
-            () => this.owner.sleep(this.owner.animedelay),
-            () => this.owner.waitAndClick(By.xpath(SipdPath.getApp(app))),
+        return this.owner.works([
+            [w => this.owner.open()],
+            [w => this.owner.waitAndClickAnimate(By.xpath(SipdPath.getApp(app)))],
         ]);
     }
 
@@ -58,17 +56,10 @@ class SipdApp {
     }
 
     setYear() {
-        return Work.works([
-            () => this.owner.sleep(),
-            () => new Promise((resolve, reject) => {
-                this.checkMain()
-                    .then(ismain => {
-                        if (ismain) return resolve();
-                        reject('Need in main page');
-                    })
-                ;
-            }),
-            () => this.owner.waitAndClick(By.xpath(SipdPath.getYear(this.owner.year))),
+        return this.owner.works([
+            [w => this.checkMain()],
+            [w => Promise.reject('Need in main page'), w => !w.getRes(0)],
+            [w => this.owner.waitAndClickAnimate(By.xpath(SipdPath.getYear(this.owner.year)))],
         ]);
     }
 
@@ -97,10 +88,10 @@ class SipdApp {
         let mitem;
         let i = 0;
         let menus = Array.isArray(menu) ? menu : [menu];
-        let works = [() => this.owner.waitAndClick(By.xpath(SipdPath.MENU))];
+        let works = [[w => this.owner.waitAndClick(By.xpath(SipdPath.MENU))]];
         menus.forEach(item => {
             works.push(
-                () => new Promise((resolve, reject) => {
+                [w => new Promise((resolve, reject) => {
                     this.owner.findElement(mitem ? {el: mitem, data: item} : item)
                         .then((el) => {
                             mitem = el;
@@ -115,8 +106,8 @@ class SipdApp {
                         })
                         .catch(err => reject(err))
                     ;
-                }),
-                () => new Promise((resolve, reject) => {
+                })],
+                [w => new Promise((resolve, reject) => {
                     if (mitem) {
                         mitem.click()
                             .then(() => resolve())
@@ -125,18 +116,18 @@ class SipdApp {
                     } else {
                         reject('Menu not found');
                     }
-                }),
-                () => new Promise((resolve, reject) => {
+                })],
+                [w => new Promise((resolve, reject) => {
                     if (++i < menus.length) {
                         this.owner.sleep(this.owner.delay)
                             .then(() => resolve());
                     } else {
                         resolve();
                     }
-                })
+                })],
             );
         });
-        return Work.works(works);
+        return this.owner.works(works);
     }
 
     showMessage(title, message) {

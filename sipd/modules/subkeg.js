@@ -25,13 +25,10 @@
 const fs = require('fs');
 const glob = require('glob');
 const path = require('path');
-const { By } = require('selenium-webdriver');
 const DomParser = require('dom-parser');
-const Work = require('@ntlab/ntlib/work');
 const Queue = require('@ntlab/ntlib/queue');
 const SipdAgr = require('./agr');
 const SipdData = require('../data');
-const SipdPath = require('../path');
 const SipdUtil = require('../util');
 
 class SipdSubkeg {
@@ -46,22 +43,18 @@ class SipdSubkeg {
             fs.mkdirSync(outdir);
         }
         this.agr.clear();
-        const works = [];
-        if (!skipDownload) {
-            works.push(() => this.downloadKegList(outdir, subkeg));
-        }
-        works.push(
-            () => this.importAgr(outdir),
-            () => this.exportXls(outdir),
-        );
-        return Work.works(works);
+        return this.owner.works([
+            [w => this.downloadKegList(outdir, subkeg), w => !skipDownload],
+            [w => this.importAgr(outdir)],
+            [w => this.exportXls(outdir)],
+        ]);
     }
 
     downloadKegList(outdir, subkeg) {
         console.log('Downloading list...');
-        return Work.works([
-            () => this.owner.app.clickMenu('Sub Kegiatan Belanja'),
-            () => this.downloadSkpdOrKegList(outdir, subkeg),
+        return this.owner.works([
+            [w => this.owner.app.clickMenu('Sub Kegiatan Belanja')],
+            [w => this.downloadSkpdOrKegList(outdir, subkeg)],
         ]);
     }
 
@@ -73,7 +66,7 @@ class SipdSubkeg {
                         // is skpd?
                         if (!result[0].kode_sub_giat) {
                             // process SKPD
-                            const q = new Queue(result, (info) => {
+                            const q = new Queue(result, info => {
                                 const url = this.owner.sipdurl.getMainUrl(info.nama_skpd.sParam);
                                 this.owner.getDriver().get(url)
                                     .then(() => {
@@ -89,7 +82,7 @@ class SipdSubkeg {
                         } else {
                             // process SUBKEG
                             result.sort((a, b) => a.kode_sub_giat.localeCompare(b.kode_sub_giat));
-                            const q = new Queue(result, (info) => {
+                            const q = new Queue(result, info => {
                                 let doit = SipdUtil.makeFloat(info.rincian) > 0;
                                 if (doit && subkeg) {
                                     if (Array.isArray(subkeg)) {
@@ -100,7 +93,7 @@ class SipdSubkeg {
                                 }
                                 if (doit) {
                                     const url = this.owner.sipdurl.getMainUrl(this.getRinciUrl(info.action));
-                                    this.downloadKeg(outdir, info.kode_sub_giat, url)
+                                    this.downloadKeg(outdir, info.kode_sub_giat, info.nama_sub_giat.nama_sub_giat, url)
                                         .then(() => q.next())
                                         .catch(err => reject(err))
                                     ;
@@ -131,12 +124,12 @@ class SipdSubkeg {
         return result;
     }
 
-    downloadKeg(outdir, keg, url) {
-        console.log('Downloading %s...', keg);
+    downloadKeg(outdir, keg, title, url) {
+        console.log('Downloading %s...', title);
         let filename = SipdUtil.cleanKode(keg) + '.json';
-        return Work.works([
-            () => this.owner.getDriver().get(url),
-            () => this.owner.data.saveData(path.join(outdir, filename), SipdData.SHOW_ITEM_ALL),
+        return this.owner.works([
+            [w => this.owner.getDriver().get(url)],
+            [w => this.owner.data.saveData(path.join(outdir, filename), SipdData.SHOW_ITEM_ALL)],
         ]);
     }
 
@@ -145,7 +138,7 @@ class SipdSubkeg {
             let count = 0;
             glob(path.join(outdir, '*.json'), (err, files) => {
                 if (err) return reject(err);
-                const q = new Queue(files, (f) => {
+                const q = new Queue(files, f => {
                     const data = JSON.parse(fs.readFileSync(f));
                     this.agr.import(data);
                     count++;

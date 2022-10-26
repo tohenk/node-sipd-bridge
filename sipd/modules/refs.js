@@ -25,7 +25,6 @@
 const fs = require('fs');
 const glob = require('glob');
 const path = require('path');
-const Work = require('@ntlab/ntlib/work');
 const Queue = require('@ntlab/ntlib/queue');
 const SipdData = require('../data');
 const SipdRefKegiatan = require('./ref/keg');
@@ -43,15 +42,11 @@ class SipdRefs {
         if (!fs.existsSync(outdir)) {
             fs.mkdirSync(outdir);
         }
-        const works = [];
-        if (!skipDownload) {
-            works.push(() => this.downloadRefs(outdir));
-        }
-        works.push(
-            () => this.importRefs(outdir),
-            () => this.exportXls(outdir),
-        );
-        return Work.works(works);
+        return this.owner.works([
+            [w => this.downloadRefs(outdir), w => !skipDownload],
+            [w => this.importRefs(outdir)],
+            [w => this.exportXls(outdir)],
+        ]);
     }
 
     downloadRefs(outdir) {
@@ -64,7 +59,7 @@ class SipdRefs {
                 {page: 'Referensi | Standar Harga | HSPK', name: 'hspk.json'},
                 {page: 'Referensi | Standar Harga | ASB', name: 'asb.json'},
             ];
-            const q = new Queue(refs, (ref) => {
+            const q = new Queue(refs, ref => {
                 this.downloadFromPage(ref.page, path.join(outdir, ref.name))
                     .then(() => q.next())
                     .catch(err => reject(err))
@@ -76,9 +71,9 @@ class SipdRefs {
 
     downloadFromPage(page, filename) {
         console.log('Downloading file %s...', filename);
-        return Work.works([
-            () => this.owner.app.clickMenu(page),
-            () => this.owner.data.saveData(filename, SipdData.SHOW_ITEM_ALL),
+        return this.owner.works([
+            [w => this.owner.app.clickMenu(page)],
+            [W => this.owner.data.saveData(filename, SipdData.SHOW_ITEM_ALL)],
         ]);
     }
 
@@ -87,7 +82,7 @@ class SipdRefs {
             let count = 0;
             glob(path.join(outdir, '*.json'), (err, files) => {
                 if (err) return reject(err);
-                const q = new Queue(files, (f) => {
+                const q = new Queue(files, f => {
                     let added = false;
                     const filename = path.basename(f).toLowerCase();
                     switch (filename) {
@@ -114,7 +109,7 @@ class SipdRefs {
 
     exportXls(outdir) {
         return new Promise((resolve, reject) => {
-            const q = new Queue(this.refs, (ref) => {
+            const q = new Queue(this.refs, ref => {
                 ref.exportXls(outdir)
                     .then(() => q.next())
                     .catch(err => reject(err))

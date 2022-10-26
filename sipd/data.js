@@ -24,7 +24,6 @@
 
 const fs = require('fs'); 
 const { By } = require('selenium-webdriver');
-const Work = require('@ntlab/ntlib/work');
 const SipdPath = require('./path');
 const SipdScript = require('./script');
 
@@ -41,8 +40,8 @@ class SipdData {
 
     isProcessing() {
         let processing;
-        return Work.works([
-            () => new Promise((resolve, reject) => {
+        return this.owner.works([
+            [w => new Promise((resolve, reject) => {
                 this.owner.findElement(By.xpath(SipdPath.DATATABLES_PROCESSING))
                     .then(el => {
                         processing = el;
@@ -50,12 +49,12 @@ class SipdData {
                     })
                     .catch(err => reject(err))
                 ;
-            }),
-            () => new Promise((resolve, reject) => {
+            })],
+            [w => new Promise((resolve, reject) => {
                 processing.isDisplayed()
                     .then(visible => resolve(visible))
                 ;
-            }),
+            })],
         ]);
     }
 
@@ -87,18 +86,12 @@ class SipdData {
     }
 
     pickData(size) {
-        let works = [];
-        if (size) {
-            works.push(
-                () => this.setPageSize(size),
-                () => this.owner.sleep(this.owner.opdelay)
-            );
-        }
-        works.push(
-            () => this.waitProcessing(),
-            () => this.getData()
-        );
-        return Work.works(works);
+        return this.owner.works([
+            [w => this.setPageSize(size), w => size],
+            [w => this.owner.sleep(this.owner.opdelay), w => size],
+            [w => this.waitProcessing()],
+            [w => this.getData()],
+        ]);
     }
 
     saveData(filename, size) {

@@ -108,6 +108,12 @@ class SipdUtil {
             })
         ;
     }
+
+    static isAlamat(s) {
+        if (s) {
+            return s.toLowerCase().match(/(kota|kab(upaten)?|kec(amatan)?|desa|ds|kel(urahan)?)(\.)?\s/g);
+        }
+    }
 }
 
 module.exports = SipdUtil;
