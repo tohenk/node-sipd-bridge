@@ -63,6 +63,19 @@ class SipdApp {
         ]);
     }
 
+    checkUnit() {
+        return this.owner.works([
+            [w => this.owner.sleep()],
+            [w => this.owner.findElements(By.xpath('//table[@id="table_respon_unit"]'))],
+            [w => Promise.resolve(console.log('User seems only associated with single unit, skipping...')), w => !w.getRes(1)],
+            [w => w.getRes(1)[0].isDisplayed(), w => w.getRes(1)],
+            [w => Promise.resolve(console.log('Unit is unavailable...')), w => w.getRes(1) && !w.getRes(3)],
+            [w => this.owner.data.waitProcessing(), w => w.getRes(1) && w.getRes(3)],
+            [w => w.getRes(1)[0].findElement(By.xpath('.//tbody/tr/td[contains(text(),"' + this.owner.unit + '")]/../td[2]/a')), w => w.getRes(1) && w.getRes(3)],
+            [w => w.res.click(), w => w.getRes(1) && w.getRes(3)],
+        ]);
+    }
+
     clickMenu(menu) {
         let i = 0;
         let items = [];

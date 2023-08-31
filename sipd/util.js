@@ -32,6 +32,11 @@ class SipdUtil {
             text = this.decodeEntities(text);
             text = this.cleanDup(text, '\'"');
         }
+        ['\'', '"'].forEach(x => {
+            if (text.substr(0, 1) == x && text.substr(-1) == x) {
+                text = text.substr(1, text.length - 2).trim();
+            }
+        });
         return text;
     }
 

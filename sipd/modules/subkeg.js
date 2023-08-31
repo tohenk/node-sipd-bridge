@@ -125,7 +125,7 @@ class SipdSubkeg {
     }
 
     downloadKeg(outdir, keg, title, url) {
-        console.log('Downloading %s...', title);
+        console.log('Downloading %s...', title.replace('\n\n', '\n').replace('\n', ''));
         let filename = SipdUtil.cleanKode(keg) + '.json';
         return this.owner.works([
             [w => this.owner.getDriver().get(url)],

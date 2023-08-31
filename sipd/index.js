@@ -29,6 +29,7 @@ const SipdSubkeg = require('./modules/subkeg');
 const SipdRefs = require('./modules/refs');
 const SipdData = require('./data');
 const SipdUrl = require('./url');
+const { By } = require('selenium-webdriver');
 
 class Sipd extends WebRobot {
 
@@ -42,6 +43,7 @@ class Sipd extends WebRobot {
         this.animedelay = this.options.animedelay || 2000;
         this.username = this.options.username;
         this.password = this.options.password;
+        this.unit = this.options.unit;
         this.year = this.options.year || (new Date()).getFullYear();
         this.data = new SipdData(this);
         this.app = new SipdApp(this);
@@ -58,8 +60,9 @@ class Sipd extends WebRobot {
                         [w => this.app.openApp(this.SIPD_APP)],
                         [w => this.login.login()],
                         [w => this.sleep(this.animedelay)],
+                        [w => this.waitAnnouncement()],
                         [w => this.app.checkMain()],
-                        [w => Promise.reject('Can\'t reach main page, login may be failed'), w => !w.getRes(3)],
+                        [w => Promise.reject('Can\'t reach main page, login may be failed'), w => !w.getRes(4)],
                     ])
                     .then(() => resolve())
                     .catch(err => {
@@ -72,6 +75,24 @@ class Sipd extends WebRobot {
                         }
                     })
                 ;
+            }
+            f();
+        });
+    }
+
+    waitAnnouncement() {
+        return new Promise((resolve, reject) => {
+            let dismissed = false;
+            const f = () => {
+                this.works([
+                    [w => this.sleep(this.delay)],
+                    [w => this.findElements(By.xpath('//div[contains(@class,"sweet-alert")]'))],
+                    [w => w.getRes(1)[0].isDisplayed(), w => w.getRes(1).length],
+                    [w => Promise.reject('Announcement is visible!'), w => w.getRes(1).length && w.getRes(2)],
+                    [w => Promise.resolve(dismissed = true)],
+                ])
+                .then(() => resolve())
+                .catch(err => f());
             }
             f();
         });
@@ -100,6 +121,7 @@ class Sipd extends WebRobot {
                 works.push(
                     [w => this.start()],
                     [w => this.app.setYear()],
+                    [w => this.app.checkUnit()],
                 );
             } else {
                 works.push([w => Promise.resolve(console.log('Skipping download...'))]);
