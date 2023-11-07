@@ -32,11 +32,17 @@ class SipdUtil {
             text = this.decodeEntities(text);
             text = this.cleanDup(text, '\'"');
         }
-        ['\'', '"'].forEach(x => {
-            if (text.substr(0, 1) == x && text.substr(-1) == x) {
-                text = text.substr(1, text.length - 2).trim();
+        let stage = 0
+        while (true) {
+            if (stage > 1) {
+                break;
             }
-        });
+            if (this.cleanses.indexOf(stage === 0 ? text.substr(0, 1) : text.substr(-1)) >= 0) {
+                text = stage === 0 ? text.substr(1) : text.substr(0, text.length - 1);
+            } else {
+                stage++;
+            }
+        }
         return text;
     }
 
@@ -118,6 +124,10 @@ class SipdUtil {
         if (s) {
             return s.toLowerCase().match(/(kota|kab(upaten)?|kec(amatan)?|desa|ds|kel(urahan)?)(\.)?\s/g);
         }
+    }
+
+    static get cleanses() {
+        return ['\'', '"', ',', '.'];
     }
 }
 

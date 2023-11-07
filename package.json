@@ -7,7 +7,8 @@
   "license": "MIT",
   "dependencies": {
     "@ntlab/ntlib": "^1.1.0",
-    "@ntlab/webrobot": "^1.4.14",
+    "@ntlab/webrobot": "^1.4.19",
+    "debug": "^4.3.4",
     "dom-parser": "^0.1.6",
     "exceljs": "^1.15.0",
     "glob": "^7.2.3"

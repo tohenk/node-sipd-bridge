@@ -27,6 +27,7 @@ const Excel = require('exceljs');
 const Queue = require('@ntlab/ntlib/queue');
 const SipdAgrWriter = require('./writer');
 const SipdUtil = require('../../util');
+const debug = require('debug')('sipd:agr');
 
 class SipdAgr {
     items = []
@@ -200,9 +201,21 @@ class SipdAgrRinci {
             const penerima = SipdUtil.cleanText(data.lokus_akun_teks);
             let uraian = SipdUtil.cleanText(data.ket_bl_teks);
             if (uraian) {
-                if (!SipdUtil.isAlamat(uraian) && uraian.indexOf(penerima) < 0) {
-                    this.spek = uraian;
-                    uraian = penerima;
+                // check => Nama Lembaga (Alamat)
+                if (!uraian.match(/(.*?)\((.*)\)/)) {
+                    debug('0>', penerima, '<=>', uraian);
+                    if (SipdUtil.isAlamat(uraian)) {
+                        if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
+                            debug('1>', `${penerima} (${uraian})`);
+                            uraian = `${penerima} (${uraian})`;
+                        }
+                    } else {
+                        if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
+                            debug('2>', penerima, JSON.stringify(this));
+                            this.spek = uraian;
+                            uraian = penerima;
+                        }
+                    }
                 }
                 this.uraian = uraian;
             }
