@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -25,22 +25,32 @@
 class SipdUtil {
 
     static cleanText(text) {
-        if (text.substr(0, 3) == '[-]' || text.substr(0, 3) == '[#]') {
-            text = text.substr(3).trim();
-        }
-        if (text) {
-            text = this.decodeEntities(text);
-            text = this.cleanDup(text, '\'"');
-        }
-        let stage = 0
-        while (true) {
-            if (stage > 1) {
-                break;
+        if (typeof text === 'string') {
+            if (text.substr(0, 3) === '[-]' || text.substr(0, 3) === '[#]') {
+                text = text.substr(3).trim();
             }
-            if (this.cleanses.indexOf(stage === 0 ? text.substr(0, 1) : text.substr(-1)) >= 0) {
-                text = stage === 0 ? text.substr(1) : text.substr(0, text.length - 1);
-            } else {
-                stage++;
+            if (text) {
+                text = this.decodeEntities(text);
+                text = this.cleanDup(text, '\'"');
+            }
+            let stage = 0
+            while (true) {
+                if (stage > 1) {
+                    break;
+                }
+                const c = stage === 0 ? text.substr(0, 1) : text.substr(-1);
+                if (this.cleanses.indexOf(c) >= 0) {
+                    // check for quote
+                    if (stage > 0 && c === '"') {
+                        if (text.indexOf('"') > 0 && text.indexOf('"') < text.length - 1) {
+                            stage++;
+                            continue;
+                        }
+                    }
+                    text = stage === 0 ? text.substr(1) : text.substr(0, text.length - 1);
+                } else {
+                    stage++;
+                }
             }
         }
         return text;
@@ -48,9 +58,11 @@ class SipdUtil {
 
     static cleanKode(kode) {
         let result = '';
-        for (let i = 0; i < kode.length; i++) {
-            if (kode.charAt(i).match(/[A-Za-z0-9]/)) {
-                result += kode.charAt(i);
+        if (typeof kode === 'string') {
+            for (let i = 0; i < kode.length; i++) {
+                if (kode.charAt(i).match(/[A-Za-z0-9]/)) {
+                    result += kode.charAt(i);
+                }
             }
         }
         return result;
@@ -127,7 +139,7 @@ class SipdUtil {
     }
 
     static get cleanses() {
-        return ['\'', '"', ',', '.'];
+        return ['\'', '"', ',', '.', '~', '!', '@', '#', '$', '%', '^', '&', '*'];
     }
 }
 

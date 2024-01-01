@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -22,49 +22,25 @@
  * SOFTWARE.
  */
 
-const SipdPath = require('./path');
-
 class SipdScript {
-
-    static setScrollerPosition(top) {
-        let scroller = SipdPath.SIDEMENU_SCROLLER_CLASS;
-        return `
-let scrollers = document.getElementsByClassName("${scroller}");
-if (scrollers.length) {
-    scrollers[0].scrollTop = ${top};
-}
-`
-    }
-
-    static getDataTablesJson() {
-        return `
-let dt = $('.dataTables_wrapper table').DataTable();
-if (dt) {
-    return dt.ajax.json();
-}
-`
-    }
 
     static bootstrapModal(title, message, button = 'Oke') {
         let id = 'x-modal-' + parseInt(Math.random() * 1000000 + 1);
         return `
-$('#wrapper').append(\`
-<div id="${id}" class="modal fade" tabindex="-1" role="dialog">
-  <div class="modal-dialog" role="document">
+$(document.body).append(\`
+<ngb-modal-window id="${id}" class="d-block modal fade show" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-md" role="document">
     <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title">${title}</h4>
+      <div class="modal-header py-2">
+        <h2 class="modal-title fw-bold">${title}</h2>
+        <button type="button" class="btn-close" aria-label="Close" onclick="const dlg=document.querySelector('#${id}');dlg.remove();return false;"></button>
       </div>
       <div class="modal-body">
-        <p>${message}</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-primary" data-dismiss="modal">${button}</button>
+        <p class="fs-1 fw-bold text-danger">${message}</p>
       </div>
     </div>
   </div>
-</div>\`);
+</ngb-modal-window>\`);
 if (!$.modalStyleIncluded) {
     $.modalStyleIncluded = true;
     // https://stackoverflow.com/questions/18422223/bootstrap-3-modal-vertical-position-center
@@ -90,7 +66,6 @@ if (!$.modalStyleIncluded) {
 \`
     );
 }
-$('#${id}').modal({show: true});
 `;
     }
 }

@@ -1,16 +1,15 @@
 {
   "name": "sipd-bridge",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "SIPD automation tools",
   "main": "index.js",
   "author": "Toha <tohenk@yahoo.com>",
   "license": "MIT",
   "dependencies": {
     "@ntlab/ntlib": "^1.1.0",
-    "@ntlab/webrobot": "^1.4.19",
+    "@ntlab/webrobot": "^1.4.23",
     "debug": "^4.3.4",
-    "dom-parser": "^0.1.6",
-    "exceljs": "^1.15.0",
-    "glob": "^7.2.3"
+    "exceljs": "^4.4.0",
+    "glob": "^10.3.10"
   }
 }

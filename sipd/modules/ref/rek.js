@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -22,73 +22,16 @@
  * SOFTWARE.
  */
 
-const path = require('path');
-const Excel = require('exceljs');
-const SipdUtil = require('../../util');
+const SipdRef = require('./ref');
 
-class SipdRefRekening {
-    items = []
+class SipdRefRekening extends SipdRef {
+
+    initialize() {
+        this.name = 'M_KODEREK';
+    }
 
     import(data) {
-        if (Array.isArray(data)) {
-            data.forEach(row => {
-                let id = row.id_akun;
-                let kode = SipdUtil.cleanKode(row.kode_akun);
-                if (kode.length != 11) {
-                    if (!this.getRek(kode)) {
-                        this.items.push({
-                            id: id,
-                            kode: kode,
-                            nama: row.nama_akun,
-                        });
-                    }
-                }
-            });
-        }
-    }
-
-    exportXls(outdir) {
-        return new Promise((resolve, reject) => {
-            try {
-                const filename = path.join(outdir, 'M_KODEREK.xlsx');
-                console.log('Creating ref %s...', filename);
-                const wb = new Excel.Workbook();
-                const sheet = wb.addWorksheet('M_KODEREK');
-                let row = 0;
-                this.items.forEach(item => {
-                    if (row == 0) {
-                        row++;
-                        sheet.getRow(row).getCell(1).value = 'ID';
-                        sheet.getRow(row).getCell(2).value = 'KODE';
-                        sheet.getRow(row).getCell(3).value = 'NAMA';
-                    }
-                    row++;
-                    sheet.getRow(row).getCell(1).value = item.id;
-                    sheet.getRow(row).getCell(2).value = item.kode;
-                    sheet.getRow(row).getCell(3).value = item.nama;
-                });
-                wb.xlsx.writeFile(filename);
-                resolve();
-            }
-            catch (err) {
-                reject(err);
-            }
-        });
-    }
-
-    getRek(kode) {
-        let result;
-        this.items.forEach(item => {
-            if (item.kode == kode) {
-                result = item;
-                return true;
-            }
-        });
-        return result;
-    }
-
-    clear() {
-        this.items = [];
+        SipdRefRekening.merge(['id_akun', 'kode_akun', 'nama_akun'], data, this.items);
     }
 }
 

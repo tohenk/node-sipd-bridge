@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -24,78 +24,26 @@
 
 const WebRobot = require('@ntlab/webrobot');
 const SipdApp = require('./modules/app');
-const SipdLogin = require('./modules/login');
 const SipdSubkeg = require('./modules/subkeg');
 const SipdRefs = require('./modules/refs');
-const SipdData = require('./data');
-const SipdUrl = require('./url');
-const { By } = require('selenium-webdriver');
+const debug = require('debug')('sipd');
 
 class Sipd extends WebRobot {
 
-    SIPD_APP = 'Sistem Informasi Keuangan Daerah'
+    WAIT_GONE = 1
+    WAIT_PRESENCE = 2
 
     initialize() {
-        this.sipdurl = new SipdUrl(this.url);
-        this.url = this.sipdurl.getUrl();
         this.delay = this.options.delay || 500;
         this.opdelay = this.options.opdelay || 400;
-        this.animedelay = this.options.animedelay || 2000;
+        this.provinsi = this.options.provinsi;
         this.username = this.options.username;
         this.password = this.options.password;
         this.unit = this.options.unit;
         this.year = this.options.year || (new Date()).getFullYear();
-        this.data = new SipdData(this);
         this.app = new SipdApp(this);
-        this.login = new SipdLogin(this);
         this.subkeg = new SipdSubkeg(this);
         this.refs = new SipdRefs(this);
-    }
-
-    start() {
-        return new Promise((resolve, reject) => {
-            let retry = 1;
-            const f = () => {
-                this.works([
-                        [w => this.app.openApp(this.SIPD_APP)],
-                        [w => this.login.login()],
-                        [w => this.sleep(this.animedelay)],
-                        [w => this.waitAnnouncement()],
-                        [w => this.app.checkMain()],
-                        [w => Promise.reject('Can\'t reach main page, login may be failed'), w => !w.getRes(4)],
-                    ])
-                    .then(() => resolve())
-                    .catch(err => {
-                        retry--;
-                        if (retry < 0) {
-                            if (err) return reject(err);
-                            reject();
-                        } else {
-                            f();
-                        }
-                    })
-                ;
-            }
-            f();
-        });
-    }
-
-    waitAnnouncement() {
-        return new Promise((resolve, reject) => {
-            let dismissed = false;
-            const f = () => {
-                this.works([
-                    [w => this.sleep(this.delay)],
-                    [w => this.findElements(By.xpath('//div[contains(@class,"sweet-alert")]'))],
-                    [w => w.getRes(1)[0].isDisplayed(), w => w.getRes(1).length],
-                    [w => Promise.reject('Announcement is visible!'), w => w.getRes(1).length && w.getRes(2)],
-                    [w => Promise.resolve(dismissed = true)],
-                ])
-                .then(() => resolve())
-                .catch(err => f());
-            }
-            f();
-        });
     }
 
     getWorks() {
@@ -106,7 +54,7 @@ class Sipd extends WebRobot {
             case Sipd.DOWNLOAD:
                 works.push([w => this.subkeg.download(this.options.dir, this.options.keg, this.options.skipDownload)]);
                 break;
-            case Sipd.UPDATE:
+            case Sipd.REFS:
                 works.push([w => this.refs.download(this.options.dir, this.options.skipDownload)]);
                 break;
         }
@@ -116,12 +64,36 @@ class Sipd extends WebRobot {
     getCommonWorks() {
         const works = [];
         const mode = this.options.mode;
-        if (mode == Sipd.DOWNLOAD || mode == Sipd.UPDATE) {
+        if (mode === Sipd.DOWNLOAD || mode === Sipd.REFS) {
             if (!this.options.skipDownload) {
                 works.push(
-                    [w => this.start()],
+                    [w => this.getDriver().sendDevToolsCommand('Page.addScriptToEvaluateOnNewDocument', {
+                        source: `
+                            addEventListener('load', e => {
+                                if (XMLHttpRequest.prototype._send === undefined) {
+                                    XMLHttpRequest.prototype._send = XMLHttpRequest.prototype.send;
+                                    XMLHttpRequest.prototype.send = function(a) {
+                                        if (window.request === undefined) {
+                                            window.request = {};
+                                        }
+                                        const uri = this.__zone_symbol__xhrURL.substr(window.location.origin.length);
+                                        window.request[uri] = this;
+                                        this._send(a);
+                                    }
+                                }
+                            });
+                            window.getXhrResponse = function(path) {
+                                if (window.request && window.request[path] !== undefined) {
+                                    const xhr = window.request[path];
+                                    if (xhr.readyState === XMLHttpRequest.DONE && xhr.status >= 200 && xhr.status < 400) {
+                                        return xhr.responseText;
+                                    }
+                                }
+                            }`
+                    })],
+                    [w => this.open()],
+                    [w => this.app.login()],
                     [w => this.app.setYear()],
-                    [w => this.app.checkUnit()],
                 );
             } else {
                 works.push([w => Promise.resolve(console.log('Skipping download...'))]);
@@ -130,35 +102,72 @@ class Sipd extends WebRobot {
         return works;
     }
 
-    waitAndClickAnimate(data) {
-        return this.works([
-            [w => this.waitFor(data)],
-            [w => this.sleep(this.animedelay)],
-            [w => w.getRes(0).click()],
-            [w => Promise.resolve(w.getRes(0))],
-        ]);
+    waitForResponse(uri, options = {}) {
+        options = options || {};
+        return new Promise((resolve, reject) => {
+            const f = () => {
+                this.getDriver().executeScript('return getXhrResponse(arguments[0])', uri)
+                    .then(result => {
+                        if (result === null) {
+                            debug(`still waiting response ${uri}`);
+                            setTimeout(f, 500);
+                        } else {
+                            if (result) {
+                                const data = JSON.parse(result);
+                                if (data.data) {
+                                    if (options.encoded) {
+                                        const b64dec = s => {
+                                            return Buffer.from(s, 'base64').toString();
+                                        }
+                                        const rev = s => {
+                                            return s.split('').reduce((acc, char) => char + acc, '');
+                                        }
+                                        result = JSON.parse(rev(b64dec(rev(b64dec(data.data)))));
+                                    } else {
+                                        result = data.data;
+                                    }
+                                }
+                            }
+                            resolve(result);
+                        }
+                    })
+                    .catch(err => reject(err));
+            }
+            f();
+        });
     }
 
-    waitPresence(data, time = null) {
-        if (null == time) {
-            time = this.wait;
+    waitForPresence(data, options = {}) {
+        options = options || {};
+        if (options.time === undefined) {
+            options.time = this.wait;
+        }
+        if (options.mode === undefined) {
+            options.mode = this.WAIT_GONE;
         }
         return new Promise((resolve, reject) => {
-            let shown = false;
-            let t = Date.now();
+            let el, presence = false;
+            const t = Date.now();
             const f = () => {
                 this.works([
                     [w => this.findElements(data)],
                     [w => new Promise((resolve, reject) => {
                         let wait = true;
-                        if (shown && w.res.length == 0) {
+                        if (options.mode === this.WAIT_GONE && presence && w.res.length === 0) {
+                            debug(`element now is gone: ${data}`);
+                            el = w.res[0];
                             wait = false;
                         }
-                        if (w.res.length == 1 && !shown) {
-                            shown = true;
+                        if (options.mode === this.WAIT_PRESENCE && !presence && w.res.length === 1) {
+                            debug(`element now is presence: ${data}`);
+                            el = w.res[0];
+                            wait = false;
+                        }
+                        if (w.res.length === 1 && !presence) {
+                            presence = true;
                         }
                         // is timed out
-                        if (!shown && Date.now() - t > time) {
+                        if (options.time > 0 && !presence && Date.now() - t > options.time) {
                             wait = false;
                         }
                         resolve(wait);
@@ -166,9 +175,10 @@ class Sipd extends WebRobot {
                 ])
                 .then(result => {
                     if (result) {
-                        setTimeout(f, !shown ? 250 : 500);
+                        debug(`still waiting for ${options.mode === this.WAIT_GONE ? 'gone' : 'presence'}: ${data}`);
+                        setTimeout(f, !presence ? 250 : 500);
                     } else {
-                        resolve();
+                        resolve(el);
                     }
                 })
                 .catch(err => reject(err));
@@ -185,8 +195,8 @@ class Sipd extends WebRobot {
         return 'download';
     }
 
-    static get UPDATE() {
-        return 'update';
+    static get REFS() {
+        return 'refs';
     }
 }
 

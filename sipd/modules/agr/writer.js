@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -35,7 +35,6 @@ class SipdAgrMetaData {
             SATUAN: 'satuan',
             HARGA: 'harga',
             TOTAL: 'total',
-            PAJAK: 'pajak',
             REF: 'ref',
         });
         this.columns = {
@@ -48,7 +47,6 @@ class SipdAgrMetaData {
             [this.column.SATUAN]: 'Satuan',
             [this.column.HARGA]: 'Harga Satuan',
             [this.column.TOTAL]: 'Total',
-            [this.column.PAJAK]: 'Pajak',
             [this.column.REF]: 'Ref',
         }
         this.headers = [
@@ -131,7 +129,6 @@ class SipdAgrWriter {
         this.rowset(this.metadata.column.VOLUME, agr.volume);
         this.rowset(this.metadata.column.HARGA, agr.harga);
         this.rowset(this.metadata.column.TOTAL, agr.total);
-        this.rowset(this.metadata.column.PAJAK, agr.pajak);
         this.rowset(this.metadata.column.REF, agr.ref);
     }
 }

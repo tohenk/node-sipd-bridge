@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -57,20 +57,36 @@ class App {
             console.log('Reading configuration %s', filename);
             this.config = JSON.parse(fs.readFileSync(filename));
         }
-        if (Cmd.get('url')) this.config.url = Cmd.get('url');
-        if (Cmd.get('username')) this.config.username = Cmd.get('username');
-        if (Cmd.get('password')) this.config.password = Cmd.get('password');
-        if (Cmd.get('year')) this.config.year = Cmd.get('year');
-        if (Cmd.get('dir')) this.config.dir = Cmd.get('dir');
-        if (Cmd.get('no-download')) this.config.skipDownload = Cmd.get('no-download');
-        if (!this.config.workdir) this.config.workdir = __dirname;
-        if (!this.config.mode) this.config.mode = Cmd.get('mode') ? Cmd.get('mode') : Sipd.DOWNLOAD;
-    
+        if (Cmd.get('url')) {
+            this.config.url = Cmd.get('url');
+        }
+        if (Cmd.get('username')) {
+            this.config.username = Cmd.get('username');
+        }
+        if (Cmd.get('password')) {
+            this.config.password = Cmd.get('password');
+        }
+        if (Cmd.get('year')) {
+            this.config.year = Cmd.get('year');
+        }
+        if (Cmd.get('dir')) {
+            this.config.dir = Cmd.get('dir');
+        }
+        if (Cmd.get('no-download')) {
+            this.config.skipDownload = Cmd.get('no-download');
+        }
+        if (!this.config.workdir) {
+            this.config.workdir = __dirname;
+        }
+        if (!this.config.mode) {
+            this.config.mode = Cmd.get('mode') ? Cmd.get('mode') : Sipd.DOWNLOAD;
+        }
+
         if (!this.config.username || !this.config.password) {
             console.log('Both username or password must be supplied!');
             return;
         }
-        if (this.config.mode == Sipd.UPLOAD && !this.config.dir) {
+        if (this.config.mode === Sipd.UPLOAD && !this.config.dir) {
             console.log('No data file to process!');
             return;
         }
@@ -79,14 +95,20 @@ class App {
         filename = path.join(__dirname, 'profiles.json');
         if (fs.existsSync(filename)) {
             const profiles = JSON.parse(fs.readFileSync(filename));
-            if (profiles.profiles) this.config.profiles = profiles.profiles;
-            if (profiles.active) profile = profiles.active;
+            if (profiles.profiles) {
+                this.config.profiles = profiles.profiles;
+            }
+            if (profiles.active) {
+                profile = profiles.active;
+            }
         }
-        if (Cmd.get('profile')) profile = Cmd.get('profile');
+        if (Cmd.get('profile')) {
+            profile = Cmd.get('profile');
+        }
         if (profile && this.config.profiles[profile]) {
             console.log('Using profile %s', profile);
             const keys = ['timeout', 'wait', 'delay', 'opdelay'];
-            for (let key in this.config.profiles[profile]) {
+            for (const key in this.config.profiles[profile]) {
                 if (keys.indexOf(key) < 0) continue;
                 this.config[key] = this.config.profiles[profile][key];
             }
@@ -106,14 +128,14 @@ class App {
         const sipd = new Sipd(this.config);
         switch (this.config.mode) {
             case Sipd.UPLOAD:
-                console.log('Processing UPLOAD, please wait...');
+                console.log('Processing agr upload, please wait...');
                 break;
             case Sipd.DOWNLOAD:
-                console.log('Processing DOWNLOAD, please wait...');
+                console.log('Processing agr download, please wait...');
                 this.checkDir('agr');
                 break;
-            case Sipd.UPDATE:
-                console.log('Processing UPDATE, please wait...');
+            case Sipd.REFS:
+                console.log('Processing references update, please wait...');
                 this.checkDir('refs');
                 break;
         }

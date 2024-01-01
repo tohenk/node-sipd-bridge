@@ -1,7 +1,8 @@
 {
-    "url":"https://jatimprov.sipd.kemendagri.go.id",
+    "url":"https://sipd-ri.kemendagri.go.id",
     "mode":"download",
+    "provinsi":"CHANGEME",
     "username":"CHANGEME",
     "password":"CHANGEME",
-    "year":"2022"
+    "year":"2024"
 }

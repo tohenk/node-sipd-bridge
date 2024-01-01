@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -32,16 +32,16 @@ const debug = require('debug')('sipd:agr');
 class SipdAgr {
     items = []
 
-    import(data) {
+    import(data, metadata) {
         if (Array.isArray(data)) {
             data.forEach(row => {
-                let kodeSubKeg = SipdUtil.cleanKode(row.kode_sub_giat);
+                let kodeSubKeg = SipdUtil.cleanKode(metadata.kode_sub_giat);
                 let subkeg = this.getSubKeg(kodeSubKeg);
                 if (!subkeg) {
-                    subkeg = new SipdAgrSubKeg(kodeSubKeg, SipdUtil.cleanText(row.nama_sub_giat));
+                    subkeg = new SipdAgrSubKeg(kodeSubKeg, SipdUtil.cleanText(metadata.nama_sub_giat));
                     this.items.push(subkeg);
                 }
-                subkeg.import(row);
+                subkeg.import(row, metadata);
             });
         }
     }
@@ -86,13 +86,13 @@ class SipdAgrSubKeg {
         this.nama = nama;
     }
 
-    import(data) {
-        this.fromJson(data);
+    import(data, metadata) {
+        this.fromJson(metadata);
         this.importPek(data);
     }
 
     importPek(data) {
-        let s = SipdUtil.cleanText(typeof data.subs_bl_teks == 'object' ? data.subs_bl_teks.subs_asli : data.subs_bl_teks);
+        const s = SipdUtil.cleanText(data.subs_bl_teks);
         let pek = this.getPek(s);
         if (!pek) {
             pek = new SipdAgrPek(s);
@@ -110,8 +110,9 @@ class SipdAgrSubKeg {
 
     getPek(pek) {
         let result;
+        pek = pek.toLowerCase();
         this.items.forEach(item => {
-            if (item.nama == pek) {
+            if (item.slug === pek) {
                 result = item;
                 return true;
             }
@@ -125,6 +126,7 @@ class SipdAgrPek {
 
     constructor(nama) {
         this.nama = nama;
+        this.slug = nama.toLowerCase();
     }
 
     import(data) {
@@ -149,7 +151,7 @@ class SipdAgrPek {
     getRek(rek) {
         let result;
         this.items.forEach(item => {
-            if (item.kode == rek) {
+            if (item.kode === rek) {
                 result = item;
                 return true;
             }
@@ -188,17 +190,17 @@ class SipdAgrRinci {
 
     fromJson(data) {
         this.ref = data.id_rinci_sub_bl;
-        this.jenis = data.jenis_bl;
         this.ssh = data.kode_standar_harga;
-        this.uraian = SipdUtil.cleanText(data.nama_standar_harga.nama_komponen);
-        this.spek = data.nama_standar_harga.spek_komponen;
-        this.satuan = data.satuan;
+        this.uraian = SipdUtil.cleanText(data.nama_standar_harga);
+        this.spek = data.spek;
         this.harga = SipdUtil.makeFloat(data.harga_satuan);
-        this.volume = SipdUtil.makeFloat(data.volume);
-        this.total = SipdUtil.makeFloat(data.rincian);
-        this.pajak = SipdUtil.makeFloat(data.pajak);
-        if (['hibah', 'bansos'].indexOf(this.jenis) >= 0) {
-            const penerima = SipdUtil.cleanText(data.lokus_akun_teks);
+        this.volume = SipdUtil.makeFloat(data.koefisien);
+        this.total = SipdUtil.makeFloat(data.total_harga);
+        this.satuan = data.koefisien.substr(this.volume.toString().length);
+        if (
+            data.penerima_bantuan ||
+            (data.subs_bl_teks && data.subs_bl_teks.toLowerCase().indexOf('bantuan hibah') >= 0)) {
+            const penerima = SipdUtil.cleanText(data.penerima_bantuan);
             let uraian = SipdUtil.cleanText(data.ket_bl_teks);
             if (uraian) {
                 // check => Nama Lembaga (Alamat)
@@ -220,7 +222,6 @@ class SipdAgrRinci {
                 this.uraian = uraian;
             }
         }
-        if (!this.satuan) this.satuan = data.sat_1;
     }
 }
 
