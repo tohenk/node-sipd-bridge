@@ -115,12 +115,29 @@ class SipdApp {
     waitCaptcha() {
         return this.owner.works([
             [w => this.owner.findElements(By.xpath('//ngx-captcha'))],
-            [w => Promise.resolve(this.owner.app.showMessage('Captcha', 'Silahkan pecahkan Captcha terlebih dahulu!')),
-                w => w.getRes(0).length],
-            [w => this.owner.waitForPresence(By.xpath('//ngx-captcha')),
-                w => w.getRes(0).length],
-            [w => Promise.resolve(console.log('Captcha is solved!')),
-                w => w.getRes(0).length],
+            [w => this.solveCaptcha(), w => w.getRes(0).length],
+            [w => this.waitSolvedCaptcha(), w => w.getRes(0).length && !w.getRes(1)],
+        ]);
+    }
+
+    solveCaptcha() {
+        return this.owner.works([
+            [w => this.owner.getDriver().executeScript(`return getCode()`)],
+            [w => this.owner.fillFormValue({target: By.xpath('//ngx-captcha/div/div/input[@type="text"]'), value: w.getRes(0)}),
+                w => w.getRes(0)],
+            [w => this.owner.click(By.xpath('//ngx-captcha/div/div/input[@type="button"]')),
+                w => w.getRes(0)],
+            [w => this.owner.sleep(this.owner.opdelay),
+                w => w.getRes(0)],
+            [w => Promise.resolve(w.getRes(0))],
+        ]);
+    }
+
+    waitSolvedCaptcha() {
+        return this.owner.works([
+            [w => Promise.resolve(this.owner.app.showMessage('Captcha', 'Please solve the captcha first!'))],
+            [w => this.owner.waitForPresence(By.xpath('//ngx-captcha'))],
+            [w => Promise.resolve(console.log('Captcha is solved!'))],
         ]);
     }
 
