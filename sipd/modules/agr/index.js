@@ -135,11 +135,10 @@ class SipdAgrPek {
     }
 
     importRek(data) {
-        let [krek, nrek] = SipdUtil.splitKode(data.nama_akun);
-        let kodeRek = SipdUtil.cleanKode(krek);
+        const kodeRek = SipdUtil.cleanKode(data.kode_akun);
         let rek = this.getRek(kodeRek);
         if (!rek) {
-            rek = new SipdAgrRek(kodeRek, nrek);
+            rek = new SipdAgrRek(kodeRek, data.nama_akun);
             this.items.push(rek);
         }
         rek.import(data);
