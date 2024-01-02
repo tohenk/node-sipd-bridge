@@ -199,3 +199,38 @@ Creating ref D:\Docs\Anggaran\sipd\refs\M_KODEREK.xlsx...
 Creating ref D:\Docs\Anggaran\sipd\refs\M_KEG.xlsx...
 Done
 ```
+
+## Summarize Downloaded Budgeting
+
+There is a tool called [Agr](/tools/Agr.xlsm) which can be used to summarize downloaded budgeting
+worksheets for easy reading. To do so, follow this steps:
+
+1. Open the tool and make sure macro is enabled
+
+    ![Enable macro](/assets/enable-macro.png)
+
+2. Open budgeting file to be summarized
+
+3. Run macro `AgrImport` to start summarize, you can run the macro by selecting `View > Macros > View Macros`
+   then choose desired macro and hit `Run` button
+
+    ![View macro](/assets/view-macro.png)
+    ![Run macro](/assets/run-selected-macro.png)
+
+4. Confirm `Yes` to start
+
+    ![Confirm summarize](/assets/summarize-confirm.png)
+
+5. Wait the app to do its job until it finished, a new workbook will be created as budgeting summary
+
+    ![Summarize done](/assets/summarize-finish.png)
+
+6. Repeat steps 2 to 5 for all budgeting files
+
+7. Select the result workbook and run `AgrFormat` macro to do formatting
+
+    ![Formatting result](/assets/formating-message.png)
+
+8. The final step is to do real summarization, run `AgrSummarize` macro and wait until it finished
+
+    ![Summarize result](/assets/summarize-result.png)
