@@ -198,6 +198,10 @@ class Sipd extends WebRobot {
         });
     }
 
+    scrollTo(top) {
+        return this.getDriver().executeScript(`window.scrollTo(0, ${top});`);
+    }
+
     static get UPLOAD() {
         return 'upload';
     }

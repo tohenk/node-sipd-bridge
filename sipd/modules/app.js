@@ -34,6 +34,8 @@ class SipdApp {
     login() {
         return this.owner.works([
             [w => this.owner.findElements(By.xpath('//app-login'))],
+            [w => w.getRes(0)[0].getRect(), w => w.getRes(0).length],
+            [w => this.owner.scrollTo(w.getRes(1).y), w => w.getRes(0).length],
             [w => this.owner.fillInForm([
                     {target: By.id('prov-autocomplete'), value: this.owner.provinsi, onfill: (el, value) => {
                         return this.owner.works([
