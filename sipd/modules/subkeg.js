@@ -40,11 +40,9 @@ class SipdSubkeg {
         if (!fs.existsSync(outdir)) {
             fs.mkdirSync(outdir);
         }
-        this.agr.clear();
         return this.owner.works([
             [w => this.downloadKegList(outdir, subkeg), w => !skipDownload],
             [w => this.importAgr(outdir)],
-            [w => this.exportXls(outdir)],
         ]);
     }
 
@@ -55,7 +53,7 @@ class SipdSubkeg {
             [w => this.owner.waitForResponse('/api/renja/sub_bl/list_belanja_by_tahun_daerah_unit', {encoded: true})],
             [w => new Promise((resolve, reject) => {
                 const items = w.getRes(1);
-                items.sort((a, b) => a.kode_sub_giat.localeCompare(b.kode_sub_giat));
+                items.sort((a, b) => `${a.kode_sub_skpd}-${a.kode_sub_giat}`.localeCompare(`${b.kode_sub_skpd}-${b.kode_sub_giat}`));
                 const q = new Queue(items, item => {
                     let doit = SipdUtil.makeFloat(item.rincian) > 0;
                     if (doit && subkeg) {
@@ -84,6 +82,14 @@ class SipdSubkeg {
         const title = data.nama_sub_giat
         const url = `${this.owner.url}/penganggaran/anggaran/cascading/rincian/sub-kegiatan/${data.id_sub_bl}`;
         const fname = SipdUtil.cleanKode(keg);
+        outdir = path.join(outdir, data.kode_sub_skpd);
+        if (!fs.existsSync(outdir)) {
+            fs.mkdirSync(outdir);
+        }
+        if (this.skpd !== data.kode_sub_skpd) {
+            this.skpd = data.kode_sub_skpd;
+            console.log('-- %s --', data.nama_sub_skpd);
+        }
         console.log('Downloading %s...', title.replace('\n\n', '\n').replace('\n', ''));
         return this.owner.works([
             [w => this.owner.getDriver().get(url)],
@@ -119,16 +125,22 @@ class SipdSubkeg {
 
     importAgr(outdir) {
         return this.owner.works([
-            [w => glob(path.join(outdir, '*.json'), {withFileTypes: true, windowsPathsNoEscape: true})],
+            [w => glob(path.join(outdir, '*', '*.json'), {withFileTypes: true, windowsPathsNoEscape: true})],
             [w => new Promise((resolve, reject) => {
                 let count = 0;
                 const files = w.getRes(0);
                 const q = new Queue(files, f => {
                     const data = JSON.parse(fs.readFileSync(path.join(f.path, f.name)));
                     const metadata = JSON.parse(fs.readFileSync(path.join(f.path, f.name.replace('.json', '.meta'))));
+                    this.agr.clear();
                     this.agr.import(data, metadata);
-                    count++;
-                    q.next();
+                    this.agr.exportXls(f.path)
+                        .then(() => {
+                            count++;
+                            q.next();
+                        })
+                        .catch(err => reject(err))
+                    ;
                 });
                 q.once('done', () => {
                     console.log('Done importing %d files...', count);

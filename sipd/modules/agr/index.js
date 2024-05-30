@@ -102,8 +102,8 @@ class SipdAgrSubKeg {
     }
 
     fromJson(data) {
-        this.kode_skpd = SipdUtil.cleanKode(data.kode_skpd);
-        this.nama_skpd = data.nama_skpd;
+        this.kode_skpd = SipdUtil.cleanKode(data.kode_sub_skpd);
+        this.nama_skpd = data.nama_sub_skpd;
         this.kode_keg = SipdUtil.cleanKode(data.kode_giat);
         this.nama_keg = data.nama_giat;
     }
