@@ -24,7 +24,7 @@
 
 const path = require('path');
 const Excel = require('exceljs');
-const Queue = require('@ntlab/ntlib/queue');
+const Queue = require('@ntlab/work/queue');
 const SipdAgrWriter = require('./writer');
 const SipdUtil = require('../../util');
 const debug = require('debug')('sipd:agr');

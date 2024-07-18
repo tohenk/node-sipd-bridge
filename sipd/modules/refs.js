@@ -25,7 +25,7 @@
 const fs = require('fs');
 const { glob } = require('glob');
 const path = require('path');
-const Queue = require('@ntlab/ntlib/queue');
+const Queue = require('@ntlab/work/queue');
 const SipdRefKegiatan = require('./ref/keg');
 const SipdRefRekening = require('./ref/rek');
 
