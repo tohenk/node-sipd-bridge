@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2025 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -96,6 +96,8 @@ class Sipd extends WebRobot {
                                     const xhr = window.request[path];
                                     if (xhr.readyState === XMLHttpRequest.DONE && xhr.status >= 200 && xhr.status < 400) {
                                         return xhr.responseText;
+                                    } else if (xhr.status >= 400) {
+                                        throw new Error(xhr.responseText);
                                     }
                                 }
                             }

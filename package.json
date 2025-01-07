@@ -6,11 +6,11 @@
   "author": "Toha <tohenk@yahoo.com>",
   "license": "MIT",
   "dependencies": {
-    "@ntlab/ntlib": "^2.1.0",
-    "@ntlab/webrobot": "^1.6.0",
-    "@ntlab/work": "^2.1.0",
-    "debug": "^4.3.5",
+    "@ntlab/ntlib": "^2.4.0",
+    "@ntlab/webrobot": "^1.8.0",
+    "@ntlab/work": "^2.2.0",
+    "debug": "^4.4.0",
     "exceljs": "^4.4.0",
-    "glob": "^10.3.10"
+    "glob": "^11.0.0"
   }
 }

@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2025 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -198,7 +198,7 @@ class SipdAgrRinci {
         this.satuan = data.koefisien.substr(this.volume.toString().length);
         if (
             data.penerima_bantuan ||
-            (data.subs_bl_teks && data.subs_bl_teks.toLowerCase().indexOf('bantuan hibah') >= 0)) {
+            (data.subs_bl_teks && data.subs_bl_teks.toLowerCase().indexOf('hibah') >= 0)) {
             const penerima = SipdUtil.cleanText(data.penerima_bantuan);
             let uraian = SipdUtil.cleanText(data.ket_bl_teks);
             if (uraian) {
@@ -210,7 +210,7 @@ class SipdAgrRinci {
                             debug('1>', `${penerima} (${uraian})`);
                             uraian = `${penerima} (${uraian})`;
                         }
-                    } else {
+                    } else if (penerima) {
                         if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
                             debug('2>', penerima, JSON.stringify(this));
                             this.spek = uraian;

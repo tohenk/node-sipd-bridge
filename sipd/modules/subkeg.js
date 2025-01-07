@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2025 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -50,7 +50,7 @@ class SipdSubkeg {
         console.log('Downloading list...');
         return this.owner.works([
             [w => this.owner.app.clickMenu('Penganggaran | Sub Kegiatan Belanja', {click: false})],
-            [w => this.owner.waitForResponse('/api/renja/sub_bl/list_belanja_by_tahun_daerah_unit', {encoded: true})],
+            [w => this.owner.waitForResponse('/api/renja/sub_bl/list_belanja_by_tahun_daerah_unit', {encoded: false})],
             [w => new Promise((resolve, reject) => {
                 const items = w.getRes(1);
                 items.sort((a, b) => `${a.kode_sub_skpd}-${a.kode_sub_giat}`.localeCompare(`${b.kode_sub_skpd}-${b.kode_sub_giat}`));

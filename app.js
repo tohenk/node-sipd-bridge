@@ -1,7 +1,7 @@
 /**
  * The MIT License (MIT)
  *
- * Copyright (c) 2022-2024 Toha <tohenk@yahoo.com>
+ * Copyright (c) 2022-2025 Toha <tohenk@yahoo.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in
@@ -57,20 +57,11 @@ class App {
             console.log('Reading configuration %s', filename);
             this.config = JSON.parse(fs.readFileSync(filename));
         }
-        if (Cmd.get('url')) {
-            this.config.url = Cmd.get('url');
-        }
-        if (Cmd.get('username')) {
-            this.config.username = Cmd.get('username');
-        }
-        if (Cmd.get('password')) {
-            this.config.password = Cmd.get('password');
-        }
-        if (Cmd.get('year')) {
-            this.config.year = Cmd.get('year');
-        }
-        if (Cmd.get('dir')) {
-            this.config.dir = Cmd.get('dir');
+        for (const a of ['url', 'username', 'password', 'year', 'dir']) {
+            const v = Cmd.get(a);
+            if (v) {
+                this.config[a] = v;
+            }
         }
         if (Cmd.get('no-download')) {
             this.config.skipDownload = Cmd.get('no-download');
