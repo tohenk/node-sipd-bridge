@@ -28,6 +28,7 @@ const path = require('path');
 const Queue = require('@ntlab/work/queue');
 const SipdAgr = require('./agr');
 const SipdUtil = require('../util');
+const debug = require('debug')('sipdagr:subkeg');
 
 class SipdSubkeg {
 
@@ -52,32 +53,64 @@ class SipdSubkeg {
             [w => this.owner.app.clickMenu('Penganggaran | Sub Kegiatan Belanja', {click: false})],
             [w => this.owner.waitForResponse('/api/renja/sub_bl/list_belanja_by_tahun_daerah_unit', {encoded: false})],
             [w => new Promise((resolve, reject) => {
-                const items = w.getRes(1);
-                items.sort((a, b) => `${a.kode_sub_skpd}-${a.kode_sub_giat}`.localeCompare(`${b.kode_sub_skpd}-${b.kode_sub_giat}`));
-                const q = new Queue(items, item => {
-                    let doit = SipdUtil.makeFloat(item.rincian) > 0;
-                    if (doit && subkeg) {
-                        if (Array.isArray(subkeg)) {
-                            doit = subkeg.indexOf(SipdUtil.cleanKode(item.kode_sub_giat)) >= 0;
-                        } else {
-                            doit = subkeg === SipdUtil.cleanKode(item.kode_sub_giat);
+                const f = a => `${a.kode_sub_skpd}-${a.kode_sub_giat}`;
+                let items = w.getRes(1);
+                const filters = [];
+                // apply filter: unit, prog, keg, and subkeg (in dotted format)
+                for (const opts of [
+                    ['unit', 'kode_skpd', 'kode_sub_skpd'],
+                    ['prog', 'kode_program'],
+                    ['keg', 'kode_giat'],
+                    ['subkeg', 'kode_sub_giat'],
+                ]) {
+                    const opt = opts.shift();
+                    if (this.owner.options[opt]) {
+                        filters.push(opt);
+                        const values = Array.isArray(this.owner.options[opt]) ? this.owner.options[opt] : [this.owner.options[opt]];
+                        items = items.filter(a => {
+                            const datas = opts.map(k => a[k]);
+                            for (const v of values) {
+                                if (datas.includes(v)) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
+                if (items.length) {
+                    items.sort((a, b) => f(a).localeCompare(f(b)));
+                    const q = new Queue(items, item => {
+                        let doit = SipdUtil.makeFloat(item.rincian) > 0;
+                        if (doit && subkeg) {
+                            if (Array.isArray(subkeg)) {
+                                doit = subkeg.indexOf(SipdUtil.cleanKode(item.kode_sub_giat)) >= 0;
+                            } else {
+                                doit = subkeg === SipdUtil.cleanKode(item.kode_sub_giat);
+                            }
                         }
-                    }
-                    if (doit) {
-                        this.downloadKeg(outdir, item)
+                        if (doit) {
+                            this.owner.works([
+                                [x => this.downloadKeg(outdir, item)],
+                            ])
                             .then(() => q.next())
-                            .catch(err => reject(err))
-                        ;
-                    } else {
-                        q.next();
-                    }
-                });
-                q.once('done', () => resolve(true));
+                            .catch(err => reject(err));
+                        } else {
+                            q.next();
+                        }
+                    });
+                    q.once('done', () => resolve(true));
+                } else {
+                    reject(`Nothing to download when applying ${filters.join(', ')} filter!`)
+                }
             })],
         ]);
     }
 
-    downloadKeg(outdir, data) {
+    downloadKeg(outdir, data, options) {
+        options = options || {};
+        const maxretry = options.retry !== undefined ? options.retry : 10;
+        const timeout = options.timeout !== undefined ? options.timeout : 30000;
         const keg = data.kode_sub_giat;
         const title = data.nama_sub_giat
         const url = `${this.owner.url}/penganggaran/anggaran/cascading/rincian/sub-kegiatan/${data.id_sub_bl}`;
@@ -90,16 +123,35 @@ class SipdSubkeg {
             this.skpd = data.kode_sub_skpd;
             console.log('-- %s --', data.nama_sub_skpd);
         }
-        console.log('Downloading %s...', title.replace('\n\n', '\n').replace('\n', ''));
-        return this.owner.works([
-            [w => this.owner.getDriver().get(url)],
-            [w => this.owner.waitForResponse('/api/renja/rinci_sub_bl/get_by_id_sub_bl')],
-            [w => this.owner.waitForResponse('/api/renja/subs_sub_bl/find_by_id_list')],
-            [w => this.owner.waitForResponse('/api/renja/ket_sub_bl/find_by_id_list')],
-            [w => this.mergeDataset(w.getRes(1), w.getRes(2), w.getRes(3))],
-            [w => Promise.resolve(fs.writeFileSync(path.join(outdir, fname + '.meta'), JSON.stringify(data, null, 2)))],
-            [w => Promise.resolve(fs.writeFileSync(path.join(outdir, fname + '.json'), JSON.stringify(w.getRes(1), null, 2)))],
-        ]);
+        let retry = maxretry;
+        const s = title.replace(/\n+/g, ' ');
+        console.log('Downloading %s...', s);
+        return new Promise((resolve, reject) => {
+            const f = () => {
+                this.owner.works([
+                    [w => this.owner.getDriver().get(url)],
+                    [w => this.owner.waitForResponse([
+                        '/api/renja/rinci_sub_bl/get_by_id_sub_bl',
+                        '/api/renja/subs_sub_bl/find_by_id_list',
+                        '/api/renja/ket_sub_bl/find_by_id_list',
+                    ], {timeout})],
+                    [w => this.mergeDataset(w.getRes(1)[0], w.getRes(1)[1], w.getRes(1)[2])],
+                    [w => Promise.resolve(fs.writeFileSync(path.join(outdir, fname + '.meta'), JSON.stringify(data, null, 2)))],
+                    [w => Promise.resolve(fs.writeFileSync(path.join(outdir, fname + '.json'), JSON.stringify(w.getRes(1)[0], null, 2)))],
+                ])
+                .then(res => resolve(res))
+                .catch(err => {
+                    debug('%s: %s', s, err);
+                    if (--retry) {
+                        console.log('Downloading %s (retry %d of %d)...', s, maxretry - retry + 1, maxretry);
+                        f();
+                    } else {
+                        reject(err);
+                    }
+                });
+            }
+            f();
+        });
     }
 
     mergeDataset(rinci, sub, ket) {

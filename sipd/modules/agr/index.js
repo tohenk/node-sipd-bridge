@@ -27,7 +27,7 @@ const Excel = require('exceljs');
 const Queue = require('@ntlab/work/queue');
 const SipdAgrWriter = require('./writer');
 const SipdUtil = require('../../util');
-const debug = require('debug')('sipd:agr');
+const debug = require('debug')('sipdagr:agr');
 
 class SipdAgr {
     items = []
@@ -205,16 +205,18 @@ class SipdAgrRinci {
                 // check => Nama Lembaga (Alamat)
                 if (!uraian.match(/(.*?)\((.*)\)/)) {
                     debug('0>', penerima, '<=>', uraian);
-                    if (SipdUtil.isAlamat(uraian)) {
-                        if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
-                            debug('1>', `${penerima} (${uraian})`);
-                            uraian = `${penerima} (${uraian})`;
-                        }
-                    } else if (penerima) {
-                        if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
-                            debug('2>', penerima, JSON.stringify(this));
-                            this.spek = uraian;
-                            uraian = penerima;
+                    if (penerima) {
+                        if (SipdUtil.isAlamat(uraian)) {
+                            if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
+                                debug('1>', `${penerima} (${uraian})`);
+                                uraian = `${penerima} (${uraian})`;
+                            }
+                        } else {
+                            if (uraian.toLowerCase().indexOf(penerima.toLowerCase()) < 0) {
+                                debug('2>', penerima, JSON.stringify(this));
+                                this.spek = uraian;
+                                uraian = penerima;
+                            }
                         }
                     }
                 }

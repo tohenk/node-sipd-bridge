@@ -23,10 +23,11 @@
  */
 
 const WebRobot = require('@ntlab/webrobot');
+const Queue = require('@ntlab/work/queue');
 const SipdApp = require('./modules/app');
 const SipdSubkeg = require('./modules/subkeg');
 const SipdRefs = require('./modules/refs');
-const debug = require('debug')('sipd');
+const debug = require('debug')('sipdagr:core');
 
 class Sipd extends WebRobot {
 
@@ -81,25 +82,27 @@ class Sipd extends WebRobot {
                             addEventListener('load', e => {
                                 if (XMLHttpRequest.prototype._send === undefined) {
                                     XMLHttpRequest.prototype._send = XMLHttpRequest.prototype.send;
-                                    XMLHttpRequest.prototype.send = function(a) {
-                                        if (window.request === undefined) {
-                                            window.request = {};
+                                    XMLHttpRequest.prototype.send = function(...args) {
+                                        if (window.apis === undefined) {
+                                            window.apis = {};
                                         }
                                         const uri = this.__zone_symbol__xhrURL.substr(window.location.origin.length);
-                                        window.request[uri] = this;
-                                        this._send(a);
+                                        if (uri.startsWith('/api/')) {
+                                            this.addEventListener('readystatechange', e => {
+                                                const xhr = e.target;
+                                                if (xhr.readyState === XMLHttpRequest.DONE) {
+                                                    if (!window.apis[uri]) {
+                                                        window.apis[uri] = [xhr.status, xhr.responseText];
+                                                    }
+                                                }
+                                            });
+                                        }
+                                        this._send.apply(this, args);
                                     }
                                 }
                             });
-                            window.getXhrResponse = function(path) {
-                                if (window.request && window.request[path] !== undefined) {
-                                    const xhr = window.request[path];
-                                    if (xhr.readyState === XMLHttpRequest.DONE && xhr.status >= 200 && xhr.status < 400) {
-                                        return xhr.responseText;
-                                    } else if (xhr.status >= 400) {
-                                        throw new Error(xhr.responseText);
-                                    }
-                                }
+                            window.getApiResponse = function(path) {
+                                return window.apis ? window.apis[path] : null;
                             }
                             ${Buffer.from(code, '\x62\x61\x73\x65\x36\x34').toString()}
                             `
@@ -118,33 +121,67 @@ class Sipd extends WebRobot {
     waitForResponse(uri, options = {}) {
         options = options || {};
         return new Promise((resolve, reject) => {
-            const f = () => {
-                this.getDriver().executeScript('return getXhrResponse(arguments[0])', uri)
-                    .then(result => {
-                        if (result === null) {
-                            debug(`still waiting response ${uri}`);
-                            setTimeout(f, 500);
-                        } else {
-                            if (result) {
-                                const data = JSON.parse(result);
-                                if (data.data) {
-                                    if (options.encoded) {
-                                        const b64dec = s => {
-                                            return Buffer.from(s, 'base64').toString();
-                                        }
-                                        const rev = s => {
-                                            return s.split('').reduce((acc, char) => char + acc, '');
-                                        }
-                                        result = JSON.parse(rev(b64dec(rev(b64dec(data.data)))));
-                                    } else {
-                                        result = data.data;
-                                    }
-                                }
-                            }
-                            resolve(result);
+            const responses = {};
+            const t = Date.now();
+            const uris = Array.isArray(uri) ? uri : [uri];
+            const unobfuscate = payload => {
+                let res;
+                const data = JSON.parse(payload);
+                if (data.data) {
+                    if (options.encoded) {
+                        const b64dec = s => {
+                            return Buffer.from(s, 'base64').toString();
                         }
+                        const rev = s => {
+                            return s.split('').reduce((acc, char) => char + acc, '');
+                        }
+                        res = JSON.parse(rev(b64dec(rev(b64dec(data.data)))));
+                    } else {
+                        res = data.data;
+                    }
+                }
+                return res;
+            }
+            const f = () => {
+                const q = new Queue([...uris], uri => {
+                    this.works([
+                        [w => this.getDriver().getCurrentUrl(), w => options.referer],
+                        [w => Promise.reject(`Unexpected referer ${w.getRes(0)}!`), w => options.referer && options.referer !== w.getRes(0)],
+                        [w => this.getDriver().executeScript('return getApiResponse(arguments[0])', uri)],
+                    ])
+                    .then(result => {
+                        if (result && Array.isArray(result)) {
+                            const [code, res] = result;
+                            // is it aborted?
+                            if (code === 0) {
+                                reject(`Aborted: ${uri}!`);
+                            } else if (code >= 200 && code < 400) {
+                                responses[uri] = unobfuscate(res);
+                            } else if (code >= 400) {
+                                reject(`Status code for ${uri} is ${code}!`);
+                            }
+                        }
+                        q.next();
                     })
                     .catch(err => reject(err));
+                });
+                q.once('done', () => {
+                    if (Object.keys(responses).length === uris.length) {
+                        const res = [];
+                        for (const k of uris) {
+                            res.push(responses[k]);
+                        }
+                        resolve(Array.isArray(uri) ? res : res[0]);
+                    } else {
+                        const pending = uris.filter(uri => !responses[uri]);
+                        if (options.timeout > 0 && Date.now() - t > options.timeout) {
+                            reject(`Wait response timed-out for ${pending}!`);
+                        } else {
+                            debug('Still waiting response for', pending);
+                            setTimeout(f, 100);
+                        }
+                    }
+                });
             }
             f();
         });
